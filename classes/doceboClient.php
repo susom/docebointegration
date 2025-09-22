@@ -175,9 +175,12 @@ class doceboClient
             throw new \RuntimeException('Docebo auth response missing access_token');
         }
         $this->access_token  = $json['access_token'];
+        ExternalModules::setSystemSetting($this->PREFIX, self::DOCEBO_ACCESS_TOKEN, $this->access_token);
         $this->refresh_token = $json['refresh_token'] ?? '';
+        ExternalModules::setSystemSetting($this->PREFIX, self::DOCEBO_REFRESH_TOKEN, $this->refresh_token);
         $expiresIn           = isset($json['expires_in']) ? (int)$json['expires_in'] : 3600;
         $this->token_expiry  = time() + $expiresIn;
+        ExternalModules::setSystemSetting($this->PREFIX, self::DOCEBO_TOKEN_EXPIRY, (string)$this->token_expiry);
     }
 
     /** Decode JSON safely */
