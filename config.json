@@ -17,14 +17,16 @@
         }
     ],
 
-    "permissions": [
-        "redcap_survey_complete"
-    ],
 
     "enable-every-page-hooks-on-system-pages": false,
     "links": {
         "project": [
-
+            {
+                "name": "Docebo Test Page",
+                "icon": "fas fa-check-circle",
+                "url": "pages/test.php",
+                "show-header-and-footer": true
+            }
         ],
         "control-center": [
 
@@ -40,7 +42,30 @@
     ],
 
     "system-settings": [
-
+        {
+            "key": "google-project-id",
+            "name": "<b>Google Cloud Project ID</b><br/>The Google Cloud Project ID that contains the secrets used for authentication to Docebo API.",
+            "required": true,
+            "type": "text"
+        },
+        {
+            "key": "docebo-access-token",
+            "name": "<b>Docebo Access Token</b><br/>Access token for Docebo API.",
+            "required": false,
+            "type": "text"
+        },
+        {
+            "key": "docebo-refresh-token",
+            "name": "<b>Docebo Refresh Token</b><br/>Refresh token for Docebo API.",
+            "required": false,
+            "type": "text"
+        },
+        {
+            "key": "docebo-token-expiry",
+            "name": "<b>Docebo Access token Expiry timestamp</b><br/>Timestamp when the access token expires.",
+            "required": false,
+            "type": "text"
+        }
     ],
 
     "crons": [
