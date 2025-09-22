@@ -1,0 +1,56 @@
+{
+    "name": "DoceboIntegration",
+
+    "namespace": "Stanford\\DoceboIntegration",
+
+    "description": "This module enrolls users requesting access to E-Reg into Docebo learning plans according to their role.",
+
+    "documentation": "README.md",
+
+    "framework-version": 16,
+
+    "authors": [
+        {
+            "name": "Ihab Zeedia",
+            "email": "ihab.zeedia@stanford.edu",
+            "institution": "Stanford Health Care"
+        }
+    ],
+
+    "permissions": [
+        "redcap_survey_complete"
+    ],
+
+    "enable-every-page-hooks-on-system-pages": false,
+    "links": {
+        "project": [
+
+        ],
+        "control-center": [
+
+        ]
+    },
+
+    "no-auth-pages": [
+
+    ],
+
+    "project-settings": [
+
+    ],
+
+    "system-settings": [
+
+    ],
+
+    "crons": [
+
+    ],
+
+    "compatibility": {
+        "php-version-min": "",
+        "php-version-max": "",
+        "redcap-version-min": "",
+        "redcap-version-max": ""
+    }
+}
