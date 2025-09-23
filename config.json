@@ -38,7 +38,12 @@
     ],
 
     "project-settings": [
-
+        {
+            "key": "e-reg-request-forms",
+            "name": "<b>E-Reg Request Survey</b><br/>The survey form that a user will be enrolled in Docebo learning plan after completion.",
+            "required": true,
+            "type": "form-list"
+        }
     ],
 
     "system-settings": [

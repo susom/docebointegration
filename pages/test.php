@@ -4,9 +4,11 @@ namespace Stanford\DoceboIntegration;
 /** @var \Stanford\DoceboIntegration\DoceboIntegration $module */
 
 try{
-    $result = $module->getDoceboClient()->get('/learn/v1/courses');
+    $email = $module->getUser()->getEmail();
+    $result = $module->getDoceboClient()->get("/manage/v1/user?search_text=$email");
     echo '<pre>';
-    print_r($result);
+    print_r($result['json']['data']['items'][0]);
+    print_r($result['json']['data']['count']);
     echo '</pre>';
 }catch (\Exception $e){
     echo "Error: " . $e->getMessage();
