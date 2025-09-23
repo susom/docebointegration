@@ -43,6 +43,24 @@
             "name": "<b>E-Reg Request Survey</b><br/>The survey form that a user will be enrolled in Docebo learning plan after completion.",
             "required": true,
             "type": "form-list"
+        },
+        {
+            "key": "docebo-user-id-field",
+            "name": "<b>Docebo User ID Field</b>",
+            "required": false,
+            "type": "field-list"
+        },
+        {
+            "key": "docebo-enrollment-status-field",
+            "name": "<b>Docebo Enrollment Status</b>",
+            "required": false,
+            "type": "field-list"
+        },
+        {
+            "key": "docebo-course-id-field",
+            "name": "<b>Docebo Course Id</b>",
+            "required": false,
+            "type": "field-list"
         }
     ],
 

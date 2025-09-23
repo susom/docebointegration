@@ -47,6 +47,7 @@ class DoceboIntegration extends \ExternalModules\AbstractExternalModule
     private $doceboUserId = null;
     private $learningPlanId;
 
+    private $courseEnrollment = [];
     /**
      * DoceboIntegration constructor.
      */
@@ -91,6 +92,32 @@ class DoceboIntegration extends \ExternalModules\AbstractExternalModule
         }
     }
 
+    private function getDoceboLearningPlanUserEnrollment(){
+        if(!$this->courseEnrollment){
+            $result = $this->getDoceboClient()->get("/learningplan/v1/learningplans/{$this->getLearningPlanId()}/courses/enrollments?user_id[]={$this->getDoceboUserId()}");
+            if(!empty($result['json']['data']['items'])){
+                $this->courseEnrollment = $result['json']['data']['items'][0];
+            }
+        }
+        return $this->courseEnrollment;
+    }
+    private function updateDoceboForm(){
+        $data = [];
+        $data[REDCap::getRecordIdField()] = $this->record_id;
+        if($this->getProjectSetting('docebo-user-id-field') != ''){
+            $data[$this->getProjectSetting('docebo-user-id-field')] = $this->getDoceboUserId();
+        }
+        if($this->getProjectSetting('docebo-enrollment-status-field') != ''){
+            $data[$this->getProjectSetting('docebo-enrollment-status-field')] = $this->getDoceboLearningPlanUserEnrollment()['enrollment_status'];
+        }
+        if($this->getProjectSetting('docebo-course-id-field') != ''){
+            $data[$this->getProjectSetting('docebo-course-id-field')] = $this->getDoceboLearningPlanUserEnrollment()['course_id'];
+        }
+        $response = \REDCap::saveData($this->getProjectId(), 'json', json_encode(array($data)));
+        if (!empty($response['errors'])) {
+            REDCap::logEvent(implode(",", $response['errors']));
+        }
+    }
     /**
      * Enroll the current user in the configured learning plan.
      *
@@ -102,6 +129,7 @@ class DoceboIntegration extends \ExternalModules\AbstractExternalModule
         $this->getDoceboClient()->post("/learningplan/v1/learningplans/{$this->getLearningPlanId()}/enrollments/{$this->getDoceboUserId()}", [
             'status' => 'subscribed'
         ]);
+        $this->updateDoceboForm();
     }
 
     /**
@@ -164,24 +192,23 @@ class DoceboIntegration extends \ExternalModules\AbstractExternalModule
     private function createDoceboUser()
     {
         try {
-            $response = $this->getDoceboUser()->post('/manage/v1/user', [
+            $response = $this->getDoceboClient()->post('/manage/v1/user', [
                 'username' => $this->user['email'],
                 'email' => $this->user['email'],
                 'firstname' => $this->user['first_name'],
                 'lastname' => $this->user['last_name'],
+                'password' => bin2hex(random_bytes(8)),
                 "force_change" => 0,
-                "level" => "user",
-                "language" => "english",
+                # level hardcoded value for user creation
+                "level" => "6",
+                "language" => "en",
                 "email_validation_status" => 1,
                 "valid" => 1,
-                "date_format" => null,
                 "timezone" => "America/Los_Angeles",
-                "role" => null,
                 "send_notification_email" => true,
                 "can_manage_subordinates" => true
             ]);
-            $body = $response->getBody();
-            return $body['data']['status'];
+            return $response['json']['data']['success'] ?? false;
         } catch (\Exception $e) {
             REDCap::logEvent("Docebo User Creation Failed", $e->getMessage(), $this->record_id, $this->getProjectId());
         }
