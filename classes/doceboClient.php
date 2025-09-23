@@ -104,6 +104,10 @@ class doceboClient
      */
     private function getSecretManager(): GoogleSecretManager
     {
+        if(!$this->googleProjectId){
+            throw new \Exception("Google project ID is required");
+        }
+
         if (!$this->secretManager) {
             $this->secretManager = new GoogleSecretManager($this->googleProjectId);
         }
