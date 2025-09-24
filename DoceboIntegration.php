@@ -1,9 +1,11 @@
 <?php
+
 namespace Stanford\DoceboIntegration;
 
 require 'vendor/autoload.php';
 
 require_once 'classes/doceboClient.php';
+require_once "emLoggerTrait.php";
 
 use REDCap;
 
@@ -16,6 +18,7 @@ use REDCap;
  */
 class DoceboIntegration extends \ExternalModules\AbstractExternalModule
 {
+    use emLoggerTrait;
 
     const REQUEST_TYPE_USER_TRANING = '3';
     private $doceboClient;
@@ -48,6 +51,7 @@ class DoceboIntegration extends \ExternalModules\AbstractExternalModule
     private $learningPlanId;
 
     private $courseEnrollment = [];
+
     /**
      * DoceboIntegration constructor.
      */
@@ -83,7 +87,11 @@ class DoceboIntegration extends \ExternalModules\AbstractExternalModule
                 }
 
                 if ($this->getRecord()[$this->getFirstEventId()]['request_type'] == self::REQUEST_TYPE_USER_TRANING) {
-                    $this->enrollUserInLearningPlan();
+                    // check if user already enrolled in the learning plan.
+                    if (empty($this->getDoceboLearningPlanUserEnrollment())) {
+                        $this->enrollUserInLearningPlan();
+                    }
+                    $this->updateDoceboForm();
                 }
             }
         } catch (\Exception $e) {
@@ -92,32 +100,85 @@ class DoceboIntegration extends \ExternalModules\AbstractExternalModule
         }
     }
 
-    private function getDoceboLearningPlanUserEnrollment(){
-        if(!$this->courseEnrollment){
+    private function getDoceboLearningPlanUserEnrollment()
+    {
+        if (!$this->courseEnrollment) {
             $result = $this->getDoceboClient()->get("/learningplan/v1/learningplans/{$this->getLearningPlanId()}/courses/enrollments?user_id[]={$this->getDoceboUserId()}");
-            if(!empty($result['json']['data']['items'])){
-                $this->courseEnrollment = $result['json']['data']['items'][0];
+            if (!empty($result['json']['data']['items'])) {
+                $this->courseEnrollment = $result['json']['data']['items'];
             }
         }
         return $this->courseEnrollment;
     }
-    private function updateDoceboForm(){
+
+    private function getInstanceIdForCourseId($course_id)
+    {
+        $instance = $this->getRecord()['repeat_instances'];
+        foreach ($instance[$this->getFirstEventId()][$this->getProjectSetting('docebo-enrollment-form')] as $key => $value) {
+            if ($value[$this->getProjectSetting('docebo-course-id-field')] == $course_id) {
+                return $key;
+            }
+        }
+        return $this->getAutoInstanceNumber($this->record_id, $this->getFirstEventId(), $this->getProjectSetting('docebo-enrollment-form'));
+    }
+    private function updateDoceboForm()
+    {
         $data = [];
-        $data[REDCap::getRecordIdField()] = $this->record_id;
-        if($this->getProjectSetting('docebo-user-id-field') != ''){
+        $project = new \Project($this->getProjectId());
+        $data[$project->table_pk] = $this->record_id;
+        if ($this->getProjectSetting('docebo-user-id-field') != '') {
             $data[$this->getProjectSetting('docebo-user-id-field')] = $this->getDoceboUserId();
         }
-        if($this->getProjectSetting('docebo-enrollment-status-field') != ''){
-            $data[$this->getProjectSetting('docebo-enrollment-status-field')] = $this->getDoceboLearningPlanUserEnrollment()['enrollment_status'];
-        }
-        if($this->getProjectSetting('docebo-course-id-field') != ''){
-            $data[$this->getProjectSetting('docebo-course-id-field')] = $this->getDoceboLearningPlanUserEnrollment()['course_id'];
-        }
-        $response = \REDCap::saveData($this->getProjectId(), 'json', json_encode(array($data)));
-        if (!empty($response['errors'])) {
-            REDCap::logEvent(implode(",", $response['errors']));
+        foreach ($this->getDoceboLearningPlanUserEnrollment() as $course) {
+            $data['redcap_repeat_instrument'] = $this->getProjectSetting('docebo-enrollment-form');
+            $data['redcap_repeat_instance'] = $this->getInstanceIdForCourseId($course['course_id']);
+
+            if ($this->getProjectSetting('docebo-enrollment-status-field') != '') {
+                $data[$this->getProjectSetting('docebo-enrollment-status-field')] = $course['enrollment_status'];
+            }
+            if ($this->getProjectSetting('docebo-course-id-field') != '') {
+                $data[$this->getProjectSetting('docebo-course-id-field')] = $course['course_id'];
+            }
+            $response = \REDCap::saveData($this->getProjectId(), 'json', json_encode(array($data)));
+            if (!empty($response['errors'])) {
+                REDCap::logEvent(implode(",", $response['errors']));
+            }
         }
     }
+
+    /**
+     * get the next available instance number for a form
+     *
+     * @param mixed $record_id
+     * @return int
+     */
+    private function getAutoInstanceNumber($record_id, $event_id, $instrument)
+    {
+        $project = new \Project($this->getProjectId());
+        $project_id = $this->getProjectId();
+
+
+        $arr = array_keys($project->forms[$instrument]['fields']);
+        $field_list = "'" . implode("','", $arr) . "'";
+
+        $data_table = method_exists('\REDCap', 'getDataTable') ? \REDCap::getDataTable($project_id) : "redcap_data";
+        $query_string = sprintf(
+            "SELECT COALESCE(MAX(IFNULL(instance,1)),0)+1 AS next_instance
+        FROM $data_table WHERE
+        `project_id` = %u
+        AND `event_id` = %u
+        AND `record`=%s
+        AND `field_name` IN (%s)",
+            $project_id, $event_id, checkNull($record_id), $field_list
+        );
+        $result = db_query($query_string);
+        if ($row = db_fetch_assoc($result)) {
+            $next_instance = @$row['next_instance'];
+            return intval($next_instance);
+        }
+        throw new \Exception("Error finding the next instance number in project {$this->project_id}, record {$record_id}", 1);
+    }
+
     /**
      * Enroll the current user in the configured learning plan.
      *
@@ -129,7 +190,6 @@ class DoceboIntegration extends \ExternalModules\AbstractExternalModule
         $this->getDoceboClient()->post("/learningplan/v1/learningplans/{$this->getLearningPlanId()}/enrollments/{$this->getDoceboUserId()}", [
             'status' => 'subscribed'
         ]);
-        $this->updateDoceboForm();
     }
 
     /**
@@ -269,5 +329,55 @@ class DoceboIntegration extends \ExternalModules\AbstractExternalModule
             $data[$key] = $this->getRecord()[$this->getFirstEventId()][$field];
         }
         return $data;
+    }
+
+    private function getProjectRecords($pid)
+    {
+        $param = array(
+            'project_id' => $pid,
+            'return_format' => 'array',
+        );
+        return \REDCap::getData($param);
+    }
+
+    public function updateDoceboEnrollmentInfo()
+    {
+        // There should only be one project with this enabled
+        foreach ($this->framework->getProjectsWithModuleEnabled() as $localProjectId) {
+            $_GET['pid'] = $localProjectId;
+            $this->setProjectId($localProjectId);
+            $this->emDebug("Working on PID: " . $localProjectId);
+            $records = $this->getProjectRecords($localProjectId);
+            foreach ($records as $record_id => $record) {
+
+                $this->record_id = $record_id;
+                $this->record = [$record_id => $record];
+
+                // reset docebo user and course enrollment for each record
+                $this->courseEnrollment = [];
+                $this->doceboUser = [];
+                $this->learningPlanId = null;
+                $this->doceboUserId = null;
+
+                if ($this->getRecord()[$this->getFirstEventId()]['request_type'] == self::REQUEST_TYPE_USER_TRANING) {
+                    try {
+                        // Load user data based on whether its for the requester or its on behalf of someone else
+                        if ($this->isRequestOnbehalfSomeoneElse()) {
+                            $this->user = $this->fillUserData($this->traineeData);
+                        } else {
+                            $this->user = $this->fillUserData($this->requesterData);
+                        }
+
+                        // check if user already enrolled in the learning plan.
+                        if (!empty($this->getDoceboLearningPlanUserEnrollment())) {
+                            $this->updateDoceboForm();
+                        }
+                    } catch (\Exception $e) {
+                        REDCap::logEvent("Docebo Integration Error", $e->getMessage(), $record_id, $localProjectId);
+                        continue;
+                    }
+                }
+            }
+        }
     }
 }

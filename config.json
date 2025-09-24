@@ -45,6 +45,12 @@
             "type": "form-list"
         },
         {
+            "key": "docebo-enrollment-form",
+            "name": "<b>Docebo Enrollment Form</b><br/>The form that contains the Docebo Course ID and Docebo User ID fields.",
+            "required": true,
+            "type": "form-list"
+        },
+        {
             "key": "docebo-user-id-field",
             "name": "<b>Docebo User ID Field</b>",
             "required": false,
@@ -92,7 +98,13 @@
     ],
 
     "crons": [
-
+        {
+            "cron_name": "docebo-enrollment-cron",
+            "cron_description": "Cron that runs daily to check on Participant enrollment status in Docebo and update the status field in REDCap accordingly.",
+            "method": "updateDoceboEnrollmentInfo",
+            "cron_frequency": "86400",
+            "cron_max_run_time": "3600"
+        }
     ],
 
     "compatibility": {
