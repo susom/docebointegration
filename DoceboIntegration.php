@@ -139,6 +139,12 @@ class DoceboIntegration extends \ExternalModules\AbstractExternalModule
             if ($this->getProjectSetting('docebo-course-id-field') != '') {
                 $data[$this->getProjectSetting('docebo-course-id-field')] = $course['course_id'];
             }
+            if ($this->getProjectSetting('docebo-course-code-field') != '') {
+                $data[$this->getProjectSetting('docebo-course-code-field')] = $course['course_code'];
+            }
+            if ($this->getProjectSetting('docebo-course-name-field') != '') {
+                $data[$this->getProjectSetting('docebo-course-name-field')] = $course['course_name'];
+            }
             $response = \REDCap::saveData($this->getProjectId(), 'json', json_encode(array($data)));
             if (!empty($response['errors'])) {
                 REDCap::logEvent(implode(",", $response['errors']));

@@ -67,6 +67,18 @@
             "name": "<b>Docebo Course Id</b>",
             "required": false,
             "type": "field-list"
+        },
+        {
+            "key": "docebo-course-code-field",
+            "name": "<b>Docebo Course Code</b>",
+            "required": false,
+            "type": "field-list"
+        },
+        {
+            "key": "docebo-course-name-field",
+            "name": "<b>Docebo Course Name</b>",
+            "required": false,
+            "type": "field-list"
         }
     ],
 
