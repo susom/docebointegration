@@ -123,13 +123,15 @@ class DoceboIntegration extends \ExternalModules\AbstractExternalModule
     }
     private function updateDoceboForm()
     {
-        $data = [];
+
         $project = new \Project($this->getProjectId());
-        $data[$project->table_pk] = $this->record_id;
-        if ($this->getProjectSetting('docebo-user-id-field') != '') {
-            $data[$this->getProjectSetting('docebo-user-id-field')] = $this->getDoceboUserId();
-        }
+
         foreach ($this->getDoceboLearningPlanUserEnrollment() as $course) {
+            $data = [];
+            $data[$project->table_pk] = $this->record_id;
+            if ($this->getProjectSetting('docebo-user-id-field') != '') {
+                $data[$this->getProjectSetting('docebo-user-id-field')] = $this->getDoceboUserId();
+            }
             $data['redcap_repeat_instrument'] = $this->getProjectSetting('docebo-enrollment-form');
             $data['redcap_repeat_instance'] = $this->getInstanceIdForCourseId($course['course_id']);
 
@@ -144,6 +146,11 @@ class DoceboIntegration extends \ExternalModules\AbstractExternalModule
             }
             if ($this->getProjectSetting('docebo-course-name-field') != '') {
                 $data[$this->getProjectSetting('docebo-course-name-field')] = $course['course_name'];
+            }
+
+            // special case if enrollment status is completed then mark the repeating form as complete.
+            if ($course['enrollment_status'] == 'completed') {
+                $data[$this->getProjectSetting('docebo-enrollment-form') . '_complete'] = '2';
             }
             $response = \REDCap::saveData($this->getProjectId(), 'json', json_encode(array($data)));
             if (!empty($response['errors'])) {
