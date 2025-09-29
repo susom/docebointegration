@@ -79,6 +79,12 @@
             "name": "<b>Docebo Course Name</b>",
             "required": false,
             "type": "field-list"
+        },
+        {
+            "key": "docebo-course-completion-date-field",
+            "name": "<b>Docebo Course Completion Date</b>",
+            "required": false,
+            "type": "field-list"
         }
     ],
 

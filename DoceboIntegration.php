@@ -147,6 +147,9 @@ class DoceboIntegration extends \ExternalModules\AbstractExternalModule
             if ($this->getProjectSetting('docebo-course-name-field') != '') {
                 $data[$this->getProjectSetting('docebo-course-name-field')] = $course['course_name'];
             }
+            if ($this->getProjectSetting('docebo-course-completion-date-field') != '') {
+                $data[$this->getProjectSetting('docebo-course-completion-date-field')] = $course['enrollment_completion_date']?: '';
+            }
 
             // special case if enrollment status is completed then mark the repeating form as complete.
             if ($course['enrollment_status'] == 'completed') {
