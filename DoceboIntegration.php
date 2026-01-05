@@ -52,6 +52,7 @@ class DoceboIntegration extends \ExternalModules\AbstractExternalModule
 
     private $courseEnrollment = [];
 
+    private $learningPlan = [];
     private $additionalTraining = [];
 
     /**
@@ -120,6 +121,38 @@ class DoceboIntegration extends \ExternalModules\AbstractExternalModule
         return $this->courseEnrollment;
     }
 
+    /**
+     * Retrieve Docebo learning plan name.
+     * @param $learningPlanId
+     * @return mixed|null
+     * @throws \Exception
+     */
+    private function getDoceboLearningPlanName($learningPlanId = null)
+    {
+        $learningPlan = $this->getDoceboLearningPlan($learningPlanId);
+        return $learningPlan['title'] ?? null;
+    }
+
+
+    /**
+     * Retrieve Docebo learning plan details.
+     * @param $learningPlanId
+     * @return array|mixed
+     * @throws \Exception
+     */
+    private function getDoceboLearningPlan($learningPlanId)
+    {
+        if(!$learningPlanId){
+            throw new \Exception("Learning plan id not set");
+        }
+
+        $result = $this->getDoceboClient()->get("learningplan/v1/learningplans/$learningPlanId");
+        if (!empty($result['json']['data'])) {
+            $this->learningPlan = $result['json']['data'];
+        }
+        return $this->learningPlan;
+    }
+
     private function getInstanceIdForCourseId($course_id)
     {
         $instance = $this->getRecord()['repeat_instances'];
@@ -134,16 +167,17 @@ class DoceboIntegration extends \ExternalModules\AbstractExternalModule
     {
 
         $project = new \Project($this->getProjectId());
-
+        $learningPlanName = $this->getDoceboLearningPlanName($this->getLearningPlanId());
         foreach ($this->getDoceboLearningPlanUserEnrollment() as $course) {
-            $this->updateDoceboCourseFields($course, $project);
+            $this->updateDoceboCourseFields($course, $project, $learningPlanName);
         }
 
         // process additional training plans
         foreach ($this->getSelectedAdditionalTrainingPlanIds() as $additionalPlanId) {
             $additionalEnrollments = $this->getDoceboLearningPlanUserEnrollment($additionalPlanId);
+            $learningPlanName = $this->getDoceboLearningPlanName($additionalPlanId);
             foreach ($additionalEnrollments as $course) {
-                $this->updateDoceboCourseFields($course, $project);
+                $this->updateDoceboCourseFields($course, $project, $learningPlanName);
             }
         }
     }
@@ -153,7 +187,7 @@ class DoceboIntegration extends \ExternalModules\AbstractExternalModule
      * @param $project
      * @return void
      */
-    private function updateDoceboCourseFields($course, $project){
+    private function updateDoceboCourseFields($course, $project, $learningPlanName = null){
         $data = [];
         $data[$project->table_pk] = $this->record_id;
         if ($this->getProjectSetting('docebo-user-id-field') != '') {
@@ -176,6 +210,9 @@ class DoceboIntegration extends \ExternalModules\AbstractExternalModule
         }
         if ($this->getProjectSetting('docebo-course-completion-date-field') != '') {
             $data[$this->getProjectSetting('docebo-course-completion-date-field')] = $course['enrollment_completion_date']?: '';
+        }
+        if ($this->getProjectSetting('docebo-learning-plan-name-field') != '') {
+            $data[$this->getProjectSetting('docebo-learning-plan-name-field')] = $learningPlanName;
         }
 
         // special case if enrollment status is completed then mark the repeating form as complete.
