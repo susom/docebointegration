@@ -81,6 +81,12 @@
             "type": "field-list"
         },
         {
+            "key": "docebo-learning-plan-name-field",
+            "name": "<b>Docebo Learning Plan Name</b>",
+            "required": false,
+            "type": "field-list"
+        },
+        {
             "key": "docebo-course-completion-date-field",
             "name": "<b>Docebo Course Completion Date</b>",
             "required": false,
