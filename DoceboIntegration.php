@@ -52,6 +52,8 @@ class DoceboIntegration extends \ExternalModules\AbstractExternalModule
 
     private $courseEnrollment = [];
 
+    private $additionalTraining = [];
+
     /**
      * DoceboIntegration constructor.
      */
@@ -91,6 +93,14 @@ class DoceboIntegration extends \ExternalModules\AbstractExternalModule
                     if (empty($this->getDoceboLearningPlanUserEnrollment())) {
                         $this->enrollUserInLearningPlan();
                     }
+
+                    // check if user enrolled in any additional training plans
+                    foreach ($this->getSelectedAdditionalTrainingPlanIds() as $additionalPlanId) {
+                        $additionalEnrollments = $this->getDoceboLearningPlanUserEnrollment($additionalPlanId);
+                        if (empty($additionalEnrollments)) {
+                            $this->enrollUserInLearningPlan($additionalPlanId);
+                        }
+                    }
                     $this->updateDoceboForm();
                 }
             }
@@ -100,13 +110,12 @@ class DoceboIntegration extends \ExternalModules\AbstractExternalModule
         }
     }
 
-    private function getDoceboLearningPlanUserEnrollment()
+    private function getDoceboLearningPlanUserEnrollment($learningPlanId = null)
     {
-        if (!$this->courseEnrollment) {
-            $result = $this->getDoceboClient()->get("/learningplan/v1/learningplans/{$this->getLearningPlanId()}/courses/enrollments?user_id[]={$this->getDoceboUserId()}");
-            if (!empty($result['json']['data']['items'])) {
-                $this->courseEnrollment = $result['json']['data']['items'];
-            }
+        $learningPlanId = $learningPlanId ?: $this->getLearningPlanId();
+        $result = $this->getDoceboClient()->get("/learningplan/v1/learningplans/$learningPlanId/courses/enrollments?user_id[]={$this->getDoceboUserId()}");
+        if (!empty($result['json']['data']['items'])) {
+            $this->courseEnrollment = $result['json']['data']['items'];
         }
         return $this->courseEnrollment;
     }
@@ -127,41 +136,57 @@ class DoceboIntegration extends \ExternalModules\AbstractExternalModule
         $project = new \Project($this->getProjectId());
 
         foreach ($this->getDoceboLearningPlanUserEnrollment() as $course) {
-            $data = [];
-            $data[$project->table_pk] = $this->record_id;
-            if ($this->getProjectSetting('docebo-user-id-field') != '') {
-                $data[$this->getProjectSetting('docebo-user-id-field')] = $this->getDoceboUserId();
-            }
-            $data['redcap_repeat_instrument'] = $this->getProjectSetting('docebo-enrollment-form');
-            $data['redcap_repeat_instance'] = $this->getInstanceIdForCourseId($course['course_id']);
+            $this->updateDoceboCourseFields($course, $project);
+        }
 
-            if ($this->getProjectSetting('docebo-enrollment-status-field') != '') {
-                $data[$this->getProjectSetting('docebo-enrollment-status-field')] = $course['enrollment_status'];
-            }
-            if ($this->getProjectSetting('docebo-course-id-field') != '') {
-                $data[$this->getProjectSetting('docebo-course-id-field')] = $course['course_id'];
-            }
-            if ($this->getProjectSetting('docebo-course-code-field') != '') {
-                $data[$this->getProjectSetting('docebo-course-code-field')] = $course['course_code'];
-            }
-            if ($this->getProjectSetting('docebo-course-name-field') != '') {
-                $data[$this->getProjectSetting('docebo-course-name-field')] = $course['course_name'];
-            }
-            if ($this->getProjectSetting('docebo-course-completion-date-field') != '') {
-                $data[$this->getProjectSetting('docebo-course-completion-date-field')] = $course['enrollment_completion_date']?: '';
-            }
-
-            // special case if enrollment status is completed then mark the repeating form as complete.
-            if ($course['enrollment_status'] == 'completed') {
-                $data[$this->getProjectSetting('docebo-enrollment-form') . '_complete'] = '2';
-            }
-            $response = \REDCap::saveData($this->getProjectId(), 'json', json_encode(array($data)));
-            if (!empty($response['errors'])) {
-                REDCap::logEvent(implode(",", $response['errors']));
+        // process additional training plans
+        foreach ($this->getSelectedAdditionalTrainingPlanIds() as $additionalPlanId) {
+            $additionalEnrollments = $this->getDoceboLearningPlanUserEnrollment($additionalPlanId);
+            foreach ($additionalEnrollments as $course) {
+                $this->updateDoceboCourseFields($course, $project);
             }
         }
     }
 
+    /**
+     * @param $course
+     * @param $project
+     * @return void
+     */
+    private function updateDoceboCourseFields($course, $project){
+        $data = [];
+        $data[$project->table_pk] = $this->record_id;
+        if ($this->getProjectSetting('docebo-user-id-field') != '') {
+            $data[$this->getProjectSetting('docebo-user-id-field')] = $this->getDoceboUserId();
+        }
+        $data['redcap_repeat_instrument'] = $this->getProjectSetting('docebo-enrollment-form');
+        $data['redcap_repeat_instance'] = $this->getInstanceIdForCourseId($course['course_id']);
+
+        if ($this->getProjectSetting('docebo-enrollment-status-field') != '') {
+            $data[$this->getProjectSetting('docebo-enrollment-status-field')] = $course['enrollment_status'];
+        }
+        if ($this->getProjectSetting('docebo-course-id-field') != '') {
+            $data[$this->getProjectSetting('docebo-course-id-field')] = $course['course_id'];
+        }
+        if ($this->getProjectSetting('docebo-course-code-field') != '') {
+            $data[$this->getProjectSetting('docebo-course-code-field')] = $course['course_code'];
+        }
+        if ($this->getProjectSetting('docebo-course-name-field') != '') {
+            $data[$this->getProjectSetting('docebo-course-name-field')] = $course['course_name'];
+        }
+        if ($this->getProjectSetting('docebo-course-completion-date-field') != '') {
+            $data[$this->getProjectSetting('docebo-course-completion-date-field')] = $course['enrollment_completion_date']?: '';
+        }
+
+        // special case if enrollment status is completed then mark the repeating form as complete.
+        if ($course['enrollment_status'] == 'completed') {
+            $data[$this->getProjectSetting('docebo-enrollment-form') . '_complete'] = '2';
+        }
+        $response = \REDCap::saveData($this->getProjectId(), 'json', json_encode(array($data)));
+        if (!empty($response['errors'])) {
+            REDCap::logEvent(implode(",", $response['errors']));
+        }
+    }
     /**
      * get the next available instance number for a form
      *
@@ -201,9 +226,10 @@ class DoceboIntegration extends \ExternalModules\AbstractExternalModule
      * @return void
      * @throws \Exception If the Docebo API call fails.
      */
-    private function enrollUserInLearningPlan()
+    private function enrollUserInLearningPlan($learningPlanId = null)
     {
-        $this->getDoceboClient()->post("/learningplan/v1/learningplans/{$this->getLearningPlanId()}/enrollments/{$this->getDoceboUserId()}", [
+        $learningPlanId = $learningPlanId ?: $this->getLearningPlanId();
+        $this->getDoceboClient()->post("/learningplan/v1/learningplans/$learningPlanId/enrollments/{$this->getDoceboUserId()}", [
             'status' => 'subscribed'
         ]);
     }
@@ -220,6 +246,24 @@ class DoceboIntegration extends \ExternalModules\AbstractExternalModule
             $this->learningPlanId = $this->getRecord()[$this->getFirstEventId()]['trainee_primary_role'];
         }
         return $this->learningPlanId;
+    }
+
+    /**
+     * Get the selected additional training plan ids from the record.
+     *
+     * @return array Array of additional training plan ids.
+     */
+    private function getSelectedAdditionalTrainingPlanIds(): array
+    {
+        if(!$this->additionalTraining){
+            $additionalTrainingIds = $this->getRecord()[$this->getFirstEventId()]['additional_training'];
+            foreach ($additionalTrainingIds as $planId => $additionalTrainingId) {
+                if($additionalTrainingId){
+                    $this->additionalTraining[] = $planId;
+                }
+            }
+        }
+        return $this->additionalTraining;
     }
 
     /**
