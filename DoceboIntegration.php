@@ -398,7 +398,7 @@ class DoceboIntegration extends \ExternalModules\AbstractExternalModule
     public function getDoceboClient()
     {
         if (!$this->doceboClient) {
-            $this->doceboClient = new DoceboClient($this->PREFIX);
+            $this->doceboClient = new DoceboClient($this->PREFIX, $this);
         }
         return $this->doceboClient;
     }
