@@ -74,6 +74,7 @@ class doceboClient
     /** @var string External Modules prefix used for system settings */
     private $PREFIX;
 
+    private $module;
     /**
      * doceboClient constructor.
      *
@@ -82,7 +83,7 @@ class doceboClient
      * @param string $refresh_token Optional initial refresh token to seed client.
      * @param string|int $token_expiry Optional token expiry (epoch seconds) to seed client.
      */
-    public function __construct($PREFIX)
+    public function __construct($PREFIX, $module = null)
     {
         $this->PREFIX = $PREFIX;
         $this->googleProjectId = ExternalModules::getSystemSetting($this->PREFIX, self::GOOGLE_PROJECT_ID) ?: '';
@@ -90,6 +91,9 @@ class doceboClient
         $this->refresh_token   = ExternalModules::getSystemSetting($this->PREFIX, self::DOCEBO_REFRESH_TOKEN) ?: '';
         $token_expiry = ExternalModules::getSystemSetting($this->PREFIX, self::DOCEBO_TOKEN_EXPIRY);
         $this->token_expiry    = is_numeric($token_expiry) ? (int)$token_expiry :  0;
+        if($module){
+            $this->module = $module;
+        }
 
         $this->http = new Client([
             'base_uri' => rtrim(self::BASE_URL, '/') . '/',
@@ -109,7 +113,7 @@ class doceboClient
         }
 
         if (!$this->secretManager) {
-            $this->secretManager = new GoogleSecretManager($this->googleProjectId);
+            $this->secretManager = new GoogleSecretManager($this->googleProjectId, null, $this->module);
         }
         return $this->secretManager;
     }

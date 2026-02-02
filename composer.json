@@ -1,5 +1,11 @@
 {
     "require": {
         "google/cloud-secret-manager": "^2.2"
+    },
+    "config": {
+        "allow-plugins": {
+            "php-http/discovery": true,
+            "tbachert/spi": true
+        }
     }
 }
